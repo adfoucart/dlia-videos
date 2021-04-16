@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 from DataGenerator import DataGenerator
 from Model import Model
+from matplotlib import pyplot as plt
 
 '''
 ### Data generator
@@ -36,11 +37,26 @@ def evaluate_model(model, validation_data):
 
 if __name__ == '__main__':
 	batch_size = 5
-	n_epochs = 2
+	n_epochs = 100
 	batches_per_epoch = 10
 	
-	dataset = DataGenerator(batch_size, batches_per_epoch, 10)
+	dataset = DataGenerator(batch_size, 10, "d:/Adrien/dataset/GlaS/train")
 	model = Model()
 	model.print()
 
-	model.fit(n_epochs, dataset)
+	history = model.fit(n_epochs, dataset)
+
+	plt.figure()
+	plt.plot(history.history['loss'], 'b-', label='training')
+	plt.plot(history.history['val_loss'], 'r-', label='validation')
+	plt.xlabel('epochs')
+	plt.ylabel('loss')
+	plt.legend()
+
+	plt.figure()
+	plt.plot(history.history['accuracy'], 'b-', label='training')
+	plt.plot(history.history['val_accuracy'], 'r-', label='validation')
+	plt.xlabel('epochs')
+	plt.ylabel('accuracy')
+	plt.legend()
+	plt.show()

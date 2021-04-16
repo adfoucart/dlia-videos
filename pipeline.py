@@ -36,27 +36,51 @@ def evaluate_model(model, validation_data):
 '''
 
 if __name__ == '__main__':
+	import sys
+
+	loadFrom = None if len(sys.argv) <= 1 else sys.argv[1]
+
 	batch_size = 5
 	n_epochs = 100
 	batches_per_epoch = 10
 	
 	dataset = DataGenerator(batch_size, 10, "d:/Adrien/dataset/GlaS/train")
-	model = Model()
+	model = Model(loadFrom=loadFrom)#loadFrom='model_1.hdf5')
 	model.print()
+	model.plot()
 
-	history = model.fit(n_epochs, dataset)
+	if( loadFrom == None ):
+		history = model.fit(n_epochs, dataset)
+		model.save('model_1.hdf5')
 
-	plt.figure()
-	plt.plot(history.history['loss'], 'b-', label='training')
-	plt.plot(history.history['val_loss'], 'r-', label='validation')
-	plt.xlabel('epochs')
-	plt.ylabel('loss')
-	plt.legend()
+		plt.figure()
+		plt.plot(history.history['loss'], 'b-', label='training')
+		plt.plot(history.history['val_loss'], 'r-', label='validation')
+		plt.xlabel('epochs')
+		plt.ylabel('loss')
+		plt.legend()
 
-	plt.figure()
-	plt.plot(history.history['accuracy'], 'b-', label='training')
-	plt.plot(history.history['val_accuracy'], 'r-', label='validation')
-	plt.xlabel('epochs')
-	plt.ylabel('accuracy')
-	plt.legend()
-	plt.show()
+		plt.figure()
+		plt.plot(history.history['accuracy'], 'b-', label='training')
+		plt.plot(history.history['val_accuracy'], 'r-', label='validation')
+		plt.xlabel('epochs')
+		plt.ylabel('accuracy')
+		plt.legend()
+		plt.show()
+
+	## Plot a few results from the training data:
+	batch_x = dataset.images[dataset.train_idxs[:5]]
+	batch_y = dataset.annotations[dataset.train_idxs[:5]]
+	pred = model.predict(batch_x)
+	pred_mask = np.argmax(pred, axis=3)
+
+	for i in range(5):
+		plt.figure()
+		plt.subplot(1,3,1)
+		plt.imshow(batch_x[i])
+		plt.contour(batch_y[i])
+		plt.subplot(1,3,2)
+		plt.imshow(pred[i,:,:,1])
+		plt.subplot(1,3,3)
+		plt.imshow(pred_mask[i])
+		plt.show()

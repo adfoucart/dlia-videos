@@ -2,10 +2,12 @@ import tensorflow as tf
 
 class Model():
 
-	def __init__(self):
-		self.set_model()
-
-		self.model.compile(optimizer='rmsprop', loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
+	def __init__(self, loadFrom=None):
+		if( loadFrom == None ):
+			self.set_model()
+			self.model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=[tf.keras.losses.SparseCategoricalCrossentropy(name='crossentropy'), 'accuracy'])
+		else:
+			self.model = tf.keras.models.load_model(loadFrom, compile=False)
 
 	def set_model(self):
 		# Model definition
@@ -43,8 +45,14 @@ class Model():
 	def print(self):
 		self.model.summary()
 
+	def plot(self):
+		tf.keras.utils.plot_model(self.model, show_shapes=True)
+
+	def save(self, fname):
+		self.model.save(fname)
+
 	def fit(self, n_epochs, dataset):
-		return self.model.fit(dataset.next_batch(n_epochs), epochs=n_epochs, steps_per_epoch=dataset.batches_per_epoch, validation_data=dataset.get_validation_data())
+		return self.model.fit(dataset.next_batch(n_epochs), epochs=n_epochs, steps_per_epoch=dataset.batches_per_epoch, validation_data=dataset.get_validation_data(), callbacks=[tf.keras.callbacks.EarlyStopping(monitor='val_crossentropy', patience=15)])
 
 	def predict(self, data):
 		return self.model.predict(data)

@@ -1,58 +1,69 @@
 import tensorflow as tf
+from skimage.measure import label, regionprops
+import numpy as np
 
 class Model():
+    """Build & use DCNN model.
+    Includes post-processing.
+    """
 
-	def __init__(self, loadFrom=None):
-		if( loadFrom == None ):
-			self.set_model()
-			self.model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=[tf.keras.losses.SparseCategoricalCrossentropy(name='crossentropy'), 'accuracy'])
-		else:
-			self.model = tf.keras.models.load_model(loadFrom, compile=False)
+    def __init__(self, image_size, clf_name, loadFrom=None):
+        """Load existing model from hdf5 file or build it from scratch."""
+        self.image_size = image_size
+        self.clf_name = clf_name
+        if( loadFrom == None ):
+            self.set_model()
+            opt = tf.keras.optimizers.Adam(
+                learning_rate=1e-4, 
+                epsilon=1e-8,
+                name='Adam')
+            self.model.compile(
+                optimizer=opt, 
+                loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
+                metrics=[tf.keras.losses.SparseCategoricalCrossentropy(name='crossentropy'), 'accuracy']
+                )
+        else:
+            self.model = tf.keras.models.load_model(loadFrom, compile=False, custom_objects={'leaky_relu': tf.nn.leaky_relu})
 
-	def set_model(self):
-		# Model definition
-		#	Input 		[256x256x3]
-		#	Conv2D 		[256x256x32]
-		#	Conv2D 		[256x256x32]
-		# 	MaxPool2D 	[128x128x32]
-		#	Conv2D		[128x128x64]
-		# 	Conv2D		[128x128x64]
-		#	MaxPool2D 	[64x64x64]
-		# 	Conv2D		[64x64x128]
-		#	Conv2D		[64x64x128]
-		#	UpSampling 	[128x128x128]
-		#	Conv2D 		[128x128x64]
-		#	UpSampling 	[256x256x64]
-		#	Conv2D 		[256x256x32]
-		#	Ouptuts 	[256x256x2]
-		inputs = tf.keras.Input(shape=(256,256,3))
-		x = tf.keras.layers.Conv2D(32, 3, activation=tf.nn.relu, padding='same')(inputs)
-		x = tf.keras.layers.Conv2D(32, 3, activation=tf.nn.relu, padding='same')(x)
-		x = tf.keras.layers.MaxPool2D(2)(x)
-		x = tf.keras.layers.Conv2D(64, 3, activation=tf.nn.relu, padding='same')(x)
-		x = tf.keras.layers.Conv2D(64, 3, activation=tf.nn.relu, padding='same')(x)
-		x = tf.keras.layers.MaxPool2D(2)(x)
-		x = tf.keras.layers.Conv2D(128, 3, activation=tf.nn.relu, padding='same')(x)
-		x = tf.keras.layers.Conv2D(128, 3, activation=tf.nn.relu, padding='same')(x)
-		x = tf.keras.layers.UpSampling2D(2)(x)
-		x = tf.keras.layers.Conv2D(64, 3, activation=tf.nn.relu, padding='same')(x)
-		x = tf.keras.layers.UpSampling2D(2)(x)
-		x = tf.keras.layers.Conv2D(32, 3, activation=tf.nn.relu, padding='same')(x)
-		outputs = tf.keras.layers.Conv2D(2, 1, activation=tf.nn.softmax)(x)
+    def print(self):
+        """Display model summary"""
+        self.model.summary()
 
-		self.model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    def plot(self):
+        """Generates plot of model architecture and saves it to model.png file"""
+        tf.keras.utils.plot_model(self.model, show_shapes=True)
 
-	def print(self):
-		self.model.summary()
+    def save(self, fname):
+        """Save whole model to file"""
+        self.model.save(fname)
 
-	def plot(self):
-		tf.keras.utils.plot_model(self.model, show_shapes=True)
+    def fit(self, n_epochs, dataset, patience=15):
+        """Fit the model on the dataset with EarlyStopping on the validation crossentropy"""
+        return self.model.fit(
+            dataset.next_batch(n_epochs), 
+            epochs=n_epochs, 
+            steps_per_epoch=dataset.batches_per_epoch, 
+            validation_data=dataset.get_validation_data(), 
+            callbacks=[
+                tf.keras.callbacks.EarlyStopping(monitor='val_crossentropy', patience=patience),
+                tf.keras.callbacks.ModelCheckpoint(f"{self.clf_name}.hdf5", save_best_only=True)
+                ]
+            )
 
-	def save(self, fname):
-		self.model.save(fname)
+    def predict(self, data):
+        """Output will be batch_sizex256x256x2, with [:,:,:,1] = p(gland)"""
+        return self.model.predict(data)
 
-	def fit(self, n_epochs, dataset):
-		return self.model.fit(dataset.next_batch(n_epochs), epochs=n_epochs, steps_per_epoch=dataset.batches_per_epoch, validation_data=dataset.get_validation_data(), callbacks=[tf.keras.callbacks.EarlyStopping(monitor='val_crossentropy', patience=15)])
-
-	def predict(self, data):
-		return self.model.predict(data)
+    @staticmethod
+    def post_process(pred, min_area=250):
+        """Label binary mask, then remove small objects & close holes"""
+        pred_mask = np.argmax(pred, axis=2)
+        lab = label(pred_mask)
+        for obj in regionprops(lab):
+            if( obj.area < min_area ):
+                lab[lab==obj.label] = 0
+            else:
+                region = lab[obj.bbox[0]:obj.bbox[2],obj.bbox[1]:obj.bbox[3]]
+                region[obj.filled_image] = obj.label
+        
+        return lab

@@ -1,4 +1,8 @@
 from Model import Model
 
-model = Model()
-model.print()
+def main():
+    model = Model()
+    model.print()
+
+if __name__ == '__main__':
+    main()

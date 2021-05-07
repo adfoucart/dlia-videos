@@ -7,15 +7,15 @@ class Model():
     Includes post-processing.
     """
 
-    def __init__(self, image_size, clf_name, loadFrom=None):
+    def __init__(self, image_size, clf_name, loadFrom=None, lr=1e-4, eps=1e-8):
         """Load existing model from hdf5 file or build it from scratch."""
         self.image_size = image_size
         self.clf_name = clf_name
         if( loadFrom == None ):
             self.set_model()
             opt = tf.keras.optimizers.Adam(
-                learning_rate=1e-4, 
-                epsilon=1e-8,
+                learning_rate=lr, 
+                epsilon=eps,
                 name='Adam')
             self.model.compile(
                 optimizer=opt, 
@@ -39,15 +39,19 @@ class Model():
 
     def fit(self, n_epochs, dataset, patience=15):
         """Fit the model on the dataset with EarlyStopping on the validation crossentropy"""
+        validation_data = None
+        callbacks = []
+        if( len(dataset.val_idxs) > 0 ):
+            callbacks = [tf.keras.callbacks.ModelCheckpoint(f"{self.clf_name}.hdf5", save_best_only=True),
+                        tf.keras.callbacks.EarlyStopping(monitor='val_crossentropy', patience=patience)]
+            validation_data = dataset.get_validation_data()
+
         return self.model.fit(
             dataset.next_batch(n_epochs), 
             epochs=n_epochs, 
             steps_per_epoch=dataset.batches_per_epoch, 
-            validation_data=dataset.get_validation_data(), 
-            callbacks=[
-                tf.keras.callbacks.EarlyStopping(monitor='val_crossentropy', patience=patience),
-                tf.keras.callbacks.ModelCheckpoint(f"{self.clf_name}.hdf5", save_best_only=True)
-                ]
+            validation_data=validation_data, 
+            callbacks=callbacks
             )
 
     def predict(self, data):
@@ -55,7 +59,7 @@ class Model():
         return self.model.predict(data)
 
     @staticmethod
-    def post_process(pred, min_area=250):
+    def post_process(pred, min_area=400):
         """Label binary mask, then remove small objects & close holes"""
         pred_mask = np.argmax(pred, axis=2)
         lab = label(pred_mask)

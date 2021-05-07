@@ -13,7 +13,7 @@ from FullImageDataGenerator import FullImageDataGenerator
 class Evaluator:
 
     @classmethod
-    def evaluate(cls, model, data, tile, train_val):
+    def evaluate(cls, model, data, train_val, overlap='minimum', min_area=4000):
         """Compute evaluation metrics (detection precision/recall + segmentation MCC) on each image, annotation pair.
 
         First, the model is used to get the prediction mask. Postprocessing is then applied, before 
@@ -32,8 +32,8 @@ class Evaluator:
             raise ValueError('train_val must be equal to train or val')
 
         for im, anno in zip(data_x, data_y):
-            if( tile ):
-                tiles = data._get_regular_tiling(im.shape)
+            if( isinstance(data, TileDataGenerator) ):
+                tiles = data._get_regular_tiling(im.shape, overlap)
                 tiles_x = []
                 tiles_y = []
                 for tx,ty in tiles:
@@ -41,12 +41,12 @@ class Evaluator:
                     tiles_y += [anno[ty:ty+data.tile_size[0],tx:tx+data.tile_size[1]]]
                 tiles_prediction = model.predict(np.array(tiles_x))
                 
-                pred_image = data.stitch(tiles_prediction, anno.shape)
-                pred_labels = model.post_process(pred_image)
+                pred_image = data.stitch(tiles_prediction, anno.shape, overlap)
+                pred_labels = model.post_process(pred_image, min_area)
             else:
                 im_ = data.preprocess_image(im)
                 pred_image = resize(model.predict(np.array([im_]))[0], im.shape[:2])
-                pred_labels = Model.post_process(pred_image)
+                pred_labels = model.post_process(pred_image, min_area)
             
             metrics += [cls._get_metrics(anno, pred_labels)]
         return np.array(metrics)
@@ -57,11 +57,18 @@ class Evaluator:
         """Compute evaluation metrics (detection precision/recall + segmentation MCC) on a 
         pair of ground truth labels / predicted labels.
         """   
+        # Remove regions which are < 5 pixels in trueLabels (sometimes there are 1-2 isolated pixels in the corner 
+        # -> not really fair to include them)
+        for i in range(1, gt_labels.max()+1):
+            if( (gt_labels==i).sum() < 5 ):
+                gt_labels[gt_labels==i] = 0
+
         trueLabels = np.unique(gt_labels)
         trueLabels = trueLabels[trueLabels>0].astype('int')
         predLabels = np.unique(pred_labels)
         predLabels = predLabels[predLabels>0].astype('int')
-        
+
+
         best_matches = np.zeros((len(predLabels),3)) # predLabel, gtLabel, isValidMatch
         best_matches[:,0] = predLabels
         for i in range(len(predLabels)):
@@ -105,8 +112,8 @@ def main():
     dataset = TileDataGenerator(5, 10, path_to_dataset, (256,384)) if tile else FullImageDataGenerator(5, 10, path_to_dataset, (256,384))
     model = Model((256,384),path_to_model,loadFrom=path_to_model)
     
-    train_metrics = Evaluator.evaluate(model, dataset, tile, 'train')
-    val_metrics = Evaluator.evaluate(model, dataset, tile, 'val')
+    train_metrics = Evaluator.evaluate(model, dataset, 'train')
+    val_metrics = Evaluator.evaluate(model, dataset, 'val')
 
     with open(f"{path_to_model}_metrics.txt", 'w') as fp:
         print("Training perfomance:", file=fp)

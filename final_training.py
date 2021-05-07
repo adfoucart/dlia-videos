@@ -44,33 +44,14 @@ def train_experiment(experiment):
     model = Model(image_size, clf_name, lr=lr, eps=eps)
     history = model.fit(max_epochs, generator, patience=patience)
 
+    model.save(f"{clf_name}.hdf5")
+
     plt.figure()
     plt.subplot(2,1,1)
-    plt.plot(history.history['val_loss'], 'r-')
     plt.plot(history.history['loss'], 'b-')
     plt.subplot(2,1,2)
-    plt.plot(history.history['val_accuracy'], 'r-')
     plt.plot(history.history['accuracy'], 'b-')
     plt.savefig(f'{clf_name}_history.png')
-
-    # Compute & save metrics
-    tile = isinstance(generator, TileDataGenerator)
-    train_metrics = Evaluator.evaluate(model, generator, 'train', overlap, min_area)
-    val_metrics = Evaluator.evaluate(model, generator, 'val', overlap, min_area)
-
-    with open(f"{clf_name}_metrics.txt", 'w') as fp:
-        print("Training perfomance:", file=fp)
-        print("Precision\tRecall\tMCC", file=fp)
-        print(train_metrics.mean(axis=0), file=fp)
-        print(np.median(train_metrics,axis=0), file=fp)
-        print(" ---- ", file=fp)
-        print("Validation perfomance:", file=fp)
-        print("Precision\tRecall\tMCC", file=fp)
-        print(val_metrics.mean(axis=0), file=fp)
-        print(np.median(val_metrics,axis=0), file=fp)
-
-    np.save(f"{clf_name}_metrics_train.npy", train_metrics)
-    np.save(f"{clf_name}_metrics_val.npy", val_metrics)
 
 def main():
     try:
@@ -80,56 +61,14 @@ def main():
 
     experiments = [
         {'datagen' : FullImageDataGenerator,
-        'model' : BaseModel,
-        'name' : 'base_model_full_image',
-        'lr' : 1e-3,
-        'eps': 1e-7,
-        'directory': directory,
-        'max_epochs': 1000,
-        'patience': 100},
-        {'datagen' : FullImageDataGenerator,
-        'model' : ShortSkipModel,
-        'name' : 'short_skip_model_full_image',
-        'lr' : 1e-3,
-        'eps': 1e-7,
-        'directory': directory,
-        'max_epochs': 1000,
-        'patience': 100},
-        {'datagen' : FullImageDataGenerator,
         'model' : LongSkipModel,
-        'name' : 'long_skip_model_full_image',
+        'name' : 'long_skip_model_full_image_retrain',
         'lr' : 1e-3,
         'eps': 1e-7,
         'directory': directory,
-        'max_epochs': 1000,
-        'patience': 100},
-        {'datagen' : TileDataGenerator,
-        'model' : BaseModel,
-        'name' : 'base_model_tile',
-        'lr' : 1e-4,
-        'eps': 1e-8,
-        'overlap': 'minimum',
-        'directory': directory,
-        'max_epochs': 1000,
-        'patience': 100},
-        {'datagen' : TileDataGenerator,
-        'model' : ShortSkipModel,
-        'name' : 'short_skip_model_tile',
-        'lr' : 1e-4,
-        'eps': 1e-8,
-        'overlap': 'minimum',
-        'directory': directory,
-        'max_epochs': 1000,
-        'patience': 100},
-        {'datagen' : TileDataGenerator,
-        'model' : LongSkipModel,
-        'name' : 'long_skip_model_tile',
-        'lr' : 1e-4,
-        'eps': 1e-8,
-        'overlap': 'minimum',
-        'directory': directory,
-        'max_epochs': 1000,
-        'patience': 100}
+        'max_epochs': 500,
+        'patience': 500,
+        'validation_size': 0}
         ]
 
     for experiment in experiments:

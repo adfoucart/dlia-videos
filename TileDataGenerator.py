@@ -1,4 +1,3 @@
-import os
 import math
 
 import numpy as np
@@ -11,8 +10,8 @@ class TileDataGenerator(DataGenerator):
 
     Uses tiled images"""
 
-    def __init__(self, batch_size, validation_size, directory, tile_size):
-        super().__init__(batch_size, validation_size, directory)
+    def __init__(self, batch_size, validation_size, directory, tile_size, train_test='train'):
+        super().__init__(batch_size, validation_size, directory, train_test)
 
         self.tile_size = tile_size
         self.batches_per_epoch = len(self.train_idxs)
@@ -43,16 +42,16 @@ class TileDataGenerator(DataGenerator):
             
             tiles = self._get_regular_tiling(im.shape)
             for tx,ty in tiles:
-                tiles_x += [im[ty:ty+self.tile_size[0],tx:tx+self.tile_size[1]]]
-                tiles_y += [anno[ty:ty+self.tile_size[0],tx:tx+self.tile_size[1]]]
+                val_x += [im[ty:ty+self.tile_size[0],tx:tx+self.tile_size[1]]]
+                val_y += [anno[ty:ty+self.tile_size[0],tx:tx+self.tile_size[1]]]
 
         return np.array(val_x), np.array(val_y)
 
     def get_validation_data_labels(self):
         return self.get_validation_data(labels=True)
 
-    def stitch(self, tiles_prediction, imshape):
-        tiles = self._get_regular_tiling(imshape)
+    def stitch(self, tiles_prediction, imshape, overlap='minimum'):
+        tiles = self._get_regular_tiling(imshape, overlap=overlap)
 
         pred_image = np.zeros(imshape+(2,)).astype('float')
         n_preds = np.zeros(imshape).astype('float') # to keep track of how many predictions were made on a given pixel
@@ -83,9 +82,13 @@ class TileDataGenerator(DataGenerator):
 
         return batch_x, batch_y
 
-    def _get_regular_tiling(self, imshape):
-        ny = math.ceil(imshape[0]/self.tile_size[0])
-        nx = math.ceil(imshape[1]/self.tile_size[1])
+    def _get_regular_tiling(self, imshape, overlap='minimum'):
+        if( overlap == 'minimum' ):
+            ny = math.ceil(imshape[0]/self.tile_size[0])
+            nx = math.ceil(imshape[1]/self.tile_size[1])
+        else:
+            ny = 16
+            nx = 24
         step_y = (imshape[0]-self.tile_size[0])/(ny-1)
         step_x = (imshape[1]-self.tile_size[1])/(nx-1)
         coords_y = np.arange(0, imshape[0]-self.tile_size[0]+1, step_y).astype('int')

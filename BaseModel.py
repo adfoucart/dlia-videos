@@ -7,8 +7,8 @@ class BaseModel(Model):
     Includes post-processing.
     """
 
-    def __init__(self, image_size, clf_name, loadFrom=None):
-        super().__init__(image_size, clf_name, loadFrom)
+    def __init__(self, image_size, clf_name, loadFrom=None, lr=1e-4, eps=1e-8):
+        super().__init__(image_size, clf_name, loadFrom=loadFrom, lr=lr, eps=eps)
 
     def set_model(self):
         inputs = tf.keras.Input(shape=self.image_size+(3,))

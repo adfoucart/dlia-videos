@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 from skimage.transform import resize
 
@@ -10,8 +8,8 @@ class FullImageDataGenerator(DataGenerator):
 
     Uses full images (no tiling)"""
 
-    def __init__(self, batch_size, validation_size, directory, image_size):
-        super().__init__(batch_size, validation_size, directory)
+    def __init__(self, batch_size, validation_size, directory, image_size, train_test='train', **kwargs):
+        super().__init__(batch_size, validation_size, directory, train_test)
 
         self.image_size = image_size
         self.batches_per_epoch = len(self.train_idxs)//self.batch_size
